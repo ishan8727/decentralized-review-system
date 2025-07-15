@@ -1,34 +1,67 @@
-import { integer } from "drizzle-orm/pg-core";
-import { serial, varchar, pgTable } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  serial,
+  text,
+  integer,
+  boolean,
+  pgEnum,
+  uniqueIndex,
+  index,
+  primaryKey,
+} from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
 
-export const user = pgTable("users", {
-  id: serial("id").primaryKey(),
-  address: varchar("address").notNull().unique(),
+// 🧾 ENUM
+export const txnStatusEnum = pgEnum('TxnStatus', ['Processing', 'Success', 'Failure']);
+
+// 👤 User
+export const users = pgTable('User', {
+  id: serial('id').primaryKey(),
+  address: text('address').notNull().unique(),
 });
 
-export const worker = pgTable("worker",{
-    id: serial("id").primaryKey(),
-    address: varchar("address").notNull().unique(),
+// ⚒️ Worker
+export const workers = pgTable('Worker', {
+  id: serial('id').primaryKey(),
+  address: text('address').notNull().unique(),
+  pendingAmount: integer('pending_amount').notNull(),
+  lockedAmount: integer('locked_amount').notNull(),
 });
 
-export const task = pgTable("task",{
-    id: serial("id").primaryKey(),
-    title: varchar("title").notNull(),
-
-    userId: integer("user_id").references(() => user.id),
+// 🧪 Task
+export const tasks = pgTable('Task', {
+  id: serial('id').primaryKey(),
+  title: text('title').default('Select the most clickable thumbnail'),
+  userId: integer('user_id').notNull(),
+  signature: text('signature').notNull(),
+  amount: integer('amount').notNull(),
+  done: boolean('done').notNull().default(false),
 });
 
-export const Options = pgTable("options",{
-    id: serial("id").primaryKey(),
-    imagrUrl: varchar("imageUrl").notNull(),
-    optionId: integer(),
-
-    taskId: integer("task_id").references(()=> task.id).notNull(), 
+// 🖼️ Option
+export const options = pgTable('Option', {
+  id: serial('id').primaryKey(),
+  imageUrl: text('image_url').notNull(),
+  taskId: integer('task_id').notNull(),
 });
 
-export const submission = pgTable("submission",{
-    id: serial("id").primaryKey(),
-    
-    workerId: integer().references(()=> worker.id),
-    optionId: integer("option_id").references(()=> Options.id)
+// 📤 Submission
+export const submissions = pgTable('Submission', {
+  id: serial('id').primaryKey(),
+  workerId: integer('worker_id').notNull(),
+  optionId: integer('option_id').notNull(),
+  taskId: integer('task_id').notNull(),
+  amount: integer('amount').notNull(),
+}, (table) => ({
+  uniqueWorkerTask: uniqueIndex('submission_unique_worker_task').on(table.workerId, table.taskId),
+}));
+
+// 💸 Payouts
+export const payouts = pgTable('Payouts', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull(),
+  amount: integer('amount').notNull(),
+  signature: text('signature').notNull(),
+  status: txnStatusEnum('status').notNull(),
 });
+
