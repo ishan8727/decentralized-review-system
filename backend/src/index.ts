@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from "express";
 import userRouter from "./routers/userRouter";
 import workerRouter from "./routers/workerRouter";

@@ -29,8 +29,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const neon_http_1 = require("drizzle-orm/neon-http");
 const serverless_1 = require("@neondatabase/serverless");
 const schema = __importStar(require("./schema"));
+const path_1 = __importDefault(require("path"));
 const dotenv_1 = __importDefault(require("dotenv"));
-dotenv_1.default.config();
+// Load env from backend root folder
+dotenv_1.default.config({ path: path_1.default.resolve(__dirname, '../../../.env') });
 if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is not defined in the environment variables.");
 }
