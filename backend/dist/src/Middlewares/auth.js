@@ -14,15 +14,19 @@ const authMiddleware = (req, res, next) => {
     try {
         const verified = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
         if (verified.userId) {
+            // @ts-ignore
             req.userId = verified.userId;
-            return next();
+            next();
+            return;
         }
         else {
-            return res.status(401).json({ message: "token not valid!" });
+            res.status(401).json({ message: "token not valid!" });
+            return;
         }
     }
     catch (error) {
-        return res.status(401).json({ message: "Unauthorized token request!" });
+        res.status(401).json({ message: "Unauthorized token request!" });
+        return;
     }
 };
 exports.default = authMiddleware;

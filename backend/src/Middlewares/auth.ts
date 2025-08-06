@@ -15,15 +15,20 @@ const authMiddleware = (req: Request, res: Response, next:NextFunction) => {
         const verified = jwt.verify(token, process.env.JWT_SECRET!) as any;
         
         if(verified.userId){
-            (req as any).userId = verified.userId;
-            return next();
+            // @ts-ignore
+            req.userId = verified.userId;
+            next();
+            return;
+            
         }
         else{
-            return res.status(401).json({message:"token not valid!"});
+            res.status(401).json({message:"token not valid!"});
+            return;
         }
 
     } catch (error) {
-        return res.status(401).json({message:"Unauthorized token request!"});
+        res.status(401).json({message:"Unauthorized token request!"});
+        return;
     }
 }
 

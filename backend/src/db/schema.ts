@@ -1,26 +1,12 @@
-import {
-  pgTable,
-  serial,
-  text,
-  integer,
-  boolean,
-  pgEnum,
-  uniqueIndex,
-  index,
-  primaryKey,
-} from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
+import { pgTable,serial,text,integer,boolean,pgEnum,uniqueIndex} from 'drizzle-orm/pg-core';
 
-// 🧾 ENUM
 export const txnStatusEnum = pgEnum('TxnStatus', ['Processing', 'Success', 'Failure']);
 
-// 👤 User
 export const users = pgTable('User', {
   id: serial('id').primaryKey(),
   address: text('address').notNull().unique(),
 });
 
-// ⚒️ Worker
 export const workers = pgTable('Worker', {
   id: serial('id').primaryKey(),
   address: text('address').notNull().unique(),
@@ -28,7 +14,6 @@ export const workers = pgTable('Worker', {
   lockedAmount: integer('locked_amount').notNull(),
 });
 
-// 🧪 Task
 export const tasks = pgTable('Task', {
   id: serial('id').primaryKey(),
   title: text('title').default('Select the most clickable thumbnail'),
@@ -38,14 +23,12 @@ export const tasks = pgTable('Task', {
   done: boolean('done').notNull().default(false),
 });
 
-// 🖼️ Option
 export const options = pgTable('Option', {
   id: serial('id').primaryKey(),
   imageUrl: text('image_url').notNull(),
   taskId: integer('task_id').notNull(),
 });
 
-// 📤 Submission
 export const submissions = pgTable('Submission', {
   id: serial('id').primaryKey(),
   workerId: integer('worker_id').notNull(),
@@ -56,7 +39,6 @@ export const submissions = pgTable('Submission', {
   uniqueWorkerTask: uniqueIndex('submission_unique_worker_task').on(table.workerId, table.taskId),
 }));
 
-// 💸 Payouts
 export const payouts = pgTable('Payouts', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').notNull(),

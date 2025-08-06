@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -14,15 +47,54 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const databse_1 = __importDefault(require("../db/databse"));
+const postgres_js_1 = require("drizzle-orm/postgres-js");
+const postgres_1 = __importDefault(require("postgres"));
 const schema_1 = require("../db/schema");
 const drizzle_orm_1 = require("drizzle-orm");
+// Initialize Drizzle with schema
+const client = (0, postgres_1.default)(process.env.DATABASE_URL);
+const schema = __importStar(require("../db/schema"));
+const db = (0, postgres_js_1.drizzle)(client, { schema });
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const client_s3_1 = require("@aws-sdk/client-s3");
 const s3_request_presigner_1 = require("@aws-sdk/s3-request-presigner");
 const auth_1 = __importDefault(require("../Middlewares/auth"));
+const validate_1 = __importDefault(require("../validate"));
 const router = (0, express_1.Router)();
+router.post('/task', auth_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const body = req.body;
+    const validation = validate_1.default.safeParse(body);
+    if (!validation.success) {
+        res.status(400).json({ error: 'Invalid input', details: validation.error });
+        return;
+    }
+    // parse signature here to check valid transaction
+    const data = validation.data;
+    console.log("Data extracted and validated!, REACHED POINT 1!");
+    try {
+        console.log("INSIDE TRY BLOCK, REACHED POINT 2!");
+        const result = yield db.transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+            const [newTask] = yield tx.insert(schema_1.tasks).values({
+                title: data.title,
+                userId: req.userId,
+                signature: 'placeholder',
+                amount: 100,
+                done: false
+            }).returning();
+            yield tx.insert(schema_1.options).values(data.options.map(x => ({
+                imageUrl: x.imageurl,
+                taskId: newTask.id
+            })));
+            return newTask;
+        }));
+        res.json({ id: result.id });
+    }
+    catch (err) {
+        console.error('Transaction error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}));
 router.get("/presignUrl", auth_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const s3Client = new client_s3_1.S3Client({
@@ -39,7 +111,7 @@ router.get("/presignUrl", auth_1.default, (req, res) => __awaiter(void 0, void 0
         const preSignedUrl = yield (0, s3_request_presigner_1.getSignedUrl)(s3Client, command, {
             expiresIn: 36000
         });
-        console.log(preSignedUrl);
+        console.log(`Presigned URL: ${preSignedUrl}`);
         res.json({ preSignedUrl });
     }
     catch (error) {
@@ -53,13 +125,13 @@ router.post("/signin", (req, res) => __awaiter(void 0, void 0, void 0, function*
     const hardcodedAddress = "0x779c7FF70C424B0A494bF524Fd4a021833D8B5bd";
     try {
         // find the user
-        const user = yield databse_1.default.query.users.findFirst({
+        const user = yield db.query.users.findFirst({
             where: (0, drizzle_orm_1.eq)(schema_1.users.address, hardcodedAddress)
         });
         let existingUser = user;
         // create one if not found
         if (!existingUser) {
-            const [newUser] = yield databse_1.default.insert(schema_1.users)
+            const [newUser] = yield db.insert(schema_1.users)
                 .values({
                 address: hardcodedAddress
             })
