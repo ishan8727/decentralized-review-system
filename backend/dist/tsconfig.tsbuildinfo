@@ -1,1 +1,1 @@
-{"root":["../drizzle.config.ts","../src/index.ts","../src/validate.ts","../src/Middlewares/auth.ts","../src/db/databse.ts","../src/db/relation.ts","../src/db/schema.ts","../src/routers/userRouter.ts","../src/routers/workerRouter.ts"],"version":"5.8.3"}
+{"root":["../drizzle.config.ts","../src/index.ts","../src/validate.ts","../src/Middlewares/auth.ts","../src/db/databse.ts","../src/db/relation.ts","../src/db/schema.ts","../src/routers/userRouter.ts","../src/routers/workerRouter.ts","../types/express/index.d.ts"],"version":"5.8.3"}

@@ -59,10 +59,82 @@ const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const client_s3_1 = require("@aws-sdk/client-s3");
 const s3_request_presigner_1 = require("@aws-sdk/s3-request-presigner");
-const auth_1 = __importDefault(require("../Middlewares/auth"));
+const auth_1 = require("../Middlewares/auth");
 const validate_1 = __importDefault(require("../validate"));
 const router = (0, express_1.Router)();
-router.post('/task', auth_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+// user polls responses on the task
+router.get('/task', auth_1.authMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const taskId = Number(req.query.taskId);
+    // @ts-ignore
+    const userId = Number(req.userId);
+    // Get the task + its options
+    const taskDetailsRaw = yield db
+        .select({
+        task: {
+            id: schema_1.tasks.id,
+            title: schema_1.tasks.title,
+            userId: schema_1.tasks.userId,
+            signature: schema_1.tasks.signature,
+            amount: schema_1.tasks.amount,
+            done: schema_1.tasks.done
+        },
+        option: {
+            id: schema_1.options.id,
+            imageUrl: schema_1.options.imageUrl,
+            taskId: schema_1.options.taskId
+        }
+    })
+        .from(schema_1.tasks)
+        .leftJoin(schema_1.options, (0, drizzle_orm_1.eq)(schema_1.options.taskId, schema_1.tasks.id))
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.tasks.userId, userId), (0, drizzle_orm_1.eq)(schema_1.tasks.id, taskId)));
+    if (taskDetailsRaw.length === 0) {
+        res.status(401).json({ message: "You dont have access to this task!!!!" });
+        return;
+    }
+    // Re-shape taskDetails to have `options` array like Prisma's include
+    const taskDetails = Object.assign(Object.assign({}, taskDetailsRaw[0].task), { options: taskDetailsRaw
+            .filter(row => row.option && row.option.id !== null)
+            .map(row => ({
+            id: row.option.id,
+            image_url: row.option.imageUrl,
+            task_id: row.option.taskId
+        })) });
+    //  Get all submissions for this task with joined option
+    const responses = yield db
+        .select({
+        id: schema_1.submissions.id,
+        taskId: schema_1.submissions.taskId,
+        optionId: schema_1.submissions.optionId,
+        option: {
+            id: schema_1.options.id,
+            imageUrl: schema_1.options.imageUrl
+        }
+    })
+        .from(schema_1.submissions)
+        .where((0, drizzle_orm_1.eq)(schema_1.submissions.taskId, taskId))
+        .leftJoin(schema_1.options, (0, drizzle_orm_1.eq)(schema_1.submissions.optionId, schema_1.options.id));
+    //  Build the `result` object like in Prisma version
+    const result = {};
+    taskDetails.options.forEach(option => {
+        result[option.id] = {
+            count: 0,
+            option: {
+                imageUrl: option.image_url
+            }
+        };
+    });
+    responses.forEach(r => {
+        if (result[r.optionId]) {
+            result[r.optionId].count++;
+        }
+    });
+    res.json({
+        result,
+        taskDetails
+    });
+}));
+// user puts tasks from here
+router.post('/task', auth_1.authMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const body = req.body;
     const validation = validate_1.default.safeParse(body);
     if (!validation.success) {
@@ -71,9 +143,7 @@ router.post('/task', auth_1.default, (req, res) => __awaiter(void 0, void 0, voi
     }
     // parse signature here to check valid transaction
     const data = validation.data;
-    console.log("Data extracted and validated!, REACHED POINT 1!");
     try {
-        console.log("INSIDE TRY BLOCK, REACHED POINT 2!");
         const result = yield db.transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
             const [newTask] = yield tx.insert(schema_1.tasks).values({
                 title: data.title,
@@ -95,7 +165,7 @@ router.post('/task', auth_1.default, (req, res) => __awaiter(void 0, void 0, voi
         res.status(500).json({ error: 'Internal server error' });
     }
 }));
-router.get("/presignUrl", auth_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.get("/presignUrl", auth_1.authMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const s3Client = new client_s3_1.S3Client({
             credentials: {

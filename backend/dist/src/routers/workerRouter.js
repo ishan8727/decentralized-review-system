@@ -1,7 +1,123 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const drizzle_orm_1 = require("drizzle-orm");
+const postgres_js_1 = require("drizzle-orm/postgres-js");
+const postgres_1 = __importDefault(require("postgres"));
+const auth_1 = require("../Middlewares/auth");
+const schema_1 = require("../db/schema");
+// Initialize Drizzle with schema
+const client = (0, postgres_1.default)(process.env.DATABASE_URL);
+const schema = __importStar(require("../db/schema"));
+const db = (0, postgres_js_1.drizzle)(client, { schema });
+const JWT_WORKER = (process.env.JWT_SECRET || '') + 'RandomString123';
 const router = (0, express_1.Router)();
-router.post("/signin", (req, res) => {
-});
+router.get('/nextTask', auth_1.workerAuthMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const workerId = req.workerId;
+    if (!workerId) {
+        res.status(401).json({ message: 'Unauthorized (no workerId)' });
+        return;
+    }
+    try {
+        const rows = yield db
+            .select({
+            id: schema_1.tasks.id,
+            title: schema_1.tasks.title,
+            userId: schema_1.tasks.userId,
+            amount: schema_1.tasks.amount,
+            done: schema_1.tasks.done,
+            signature: schema_1.tasks.signature
+        })
+            .from(schema_1.tasks)
+            .leftJoin(schema_1.submissions, (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.submissions.taskId, schema_1.tasks.id), (0, drizzle_orm_1.eq)(schema_1.submissions.workerId, workerId)))
+            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.isNull)(schema_1.submissions.id), (0, drizzle_orm_1.eq)(schema_1.tasks.done, false)))
+            .limit(1);
+        if (!rows.length) {
+            res.status(404).json({ message: 'No tasks available' });
+            return;
+        }
+        res.json(rows[0]);
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}));
+router.post('/signin', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const hardcodedAddress = '0x779c7FF70C424B0A494bF524Fd4a021833D8B5bd';
+    try {
+        // find the user
+        const worker = yield db.query.workers.findFirst({
+            where: (0, drizzle_orm_1.eq)(schema_1.workers.address, hardcodedAddress)
+        });
+        let existingWorker = worker;
+        // create one if not found
+        if (!existingWorker) {
+            const [newWorker] = yield db.insert(schema_1.workers)
+                .values({
+                address: hardcodedAddress,
+                pendingAmount: 0,
+                lockedAmount: 0
+            })
+                .returning();
+            existingWorker = newWorker;
+            console.log(`Created new user ${newWorker}! and -> ${existingWorker}`);
+        }
+        const token = jsonwebtoken_1.default.sign({ workerId: existingWorker.id }, JWT_WORKER, { expiresIn: '7d' });
+        console.log(`Token generated! ${token}`);
+        res.json({ token });
+        return;
+    }
+    catch (error) {
+        console.error('Error during worker sign-in:', error);
+        res.status(500).json({ error: 'Internal server error during sign-in' });
+        return;
+    }
+}));
 exports.default = router;

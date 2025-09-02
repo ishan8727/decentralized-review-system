@@ -19,7 +19,6 @@ const authMiddleware = (req: Request, res: Response, next:NextFunction) => {
             req.userId = verified.userId;
             next();
             return;
-            
         }
         else{
             res.status(401).json({message:"token not valid!"});
@@ -32,4 +31,33 @@ const authMiddleware = (req: Request, res: Response, next:NextFunction) => {
     }
 }
 
-export default authMiddleware;
+// worker authenticaion!
+
+const WORKER_TOKEN_JWT = process.env.JWT_SECRET + "RandomString123";
+
+const workerAuthMiddleware = (req: Request, res: Response, next:NextFunction)=>{
+    const authheaders = req.headers['authorization'];
+
+    if(!authheaders) return res.status(401).json({ message: "Unauthorized Request!" });
+
+    const token = authheaders.split(' ')[1];
+
+    try {
+        const verified = jwt.verify(token, WORKER_TOKEN_JWT) as any;
+
+        if (verified.workerId){
+            // @ts-ignore
+            req.workerId = verified.workerId;
+            next();
+            return;
+        }else{
+            return res.status(401).json({ message: "Token not valid!" });
+        }
+    } catch (error) {
+        return res.status(401).json({message:"Token not valid!"});
+    }
+
+}
+
+export {authMiddleware, workerAuthMiddleware};
+
