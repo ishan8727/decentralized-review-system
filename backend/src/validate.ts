@@ -1,6 +1,6 @@
 import z from 'zod';
 
-const imageValidate = z.object({
+export const imageValidate = z.object({
     options: z.array(z.object({
         imageurl: z.string()
     })),
@@ -8,4 +8,7 @@ const imageValidate = z.object({
     signature: z.string()
 });
 
-export default imageValidate;
+export const createSubmissionInput = z.object({
+    taskId: z.string(),
+    selection: z.string()
+})

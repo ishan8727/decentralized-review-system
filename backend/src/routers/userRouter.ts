@@ -16,7 +16,7 @@ dotenv.config();
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { authMiddleware } from "../Middlewares/auth";
-import imageValidate from "../validate";
+import {imageValidate} from "../validate";
 const router = Router();
 
 // user polls responses on the task

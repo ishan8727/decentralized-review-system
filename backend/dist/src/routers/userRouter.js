@@ -60,7 +60,7 @@ dotenv_1.default.config();
 const client_s3_1 = require("@aws-sdk/client-s3");
 const s3_request_presigner_1 = require("@aws-sdk/s3-request-presigner");
 const auth_1 = require("../Middlewares/auth");
-const validate_1 = __importDefault(require("../validate"));
+const validate_1 = require("../validate");
 const router = (0, express_1.Router)();
 // user polls responses on the task
 router.get('/task', auth_1.authMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -136,7 +136,7 @@ router.get('/task', auth_1.authMiddleware, (req, res) => __awaiter(void 0, void 
 // user puts tasks from here
 router.post('/task', auth_1.authMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const body = req.body;
-    const validation = validate_1.default.safeParse(body);
+    const validation = validate_1.imageValidate.safeParse(body);
     if (!validation.success) {
         res.status(400).json({ error: 'Invalid input', details: validation.error });
         return;

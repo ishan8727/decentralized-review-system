@@ -51,55 +51,47 @@ const drizzle_orm_1 = require("drizzle-orm");
 const postgres_js_1 = require("drizzle-orm/postgres-js");
 const postgres_1 = __importDefault(require("postgres"));
 const auth_1 = require("../Middlewares/auth");
-const schema_1 = require("../db/schema");
+const schema = __importStar(require("../db/schema"));
+const databse_1 = require("../db/databse");
+const { workers, tasks, submissions, options } = schema;
 // Initialize Drizzle with schema
 const client = (0, postgres_1.default)(process.env.DATABASE_URL);
-const schema = __importStar(require("../db/schema"));
 const db = (0, postgres_js_1.drizzle)(client, { schema });
 const JWT_WORKER = (process.env.JWT_SECRET || '') + 'RandomString123';
 const router = (0, express_1.Router)();
+router.post('/submissions', auth_1.workerAuthMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    // TODO: Implement submission logic
+    res.status(501).json({ message: 'Not implemented' });
+}));
 router.get('/nextTask', auth_1.workerAuthMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const workerId = req.workerId;
     if (!workerId) {
-        res.status(401).json({ message: 'Unauthorized (no workerId)' });
+        res.status(401).json({ message: 'workerId not found!' });
         return;
     }
     try {
-        const rows = yield db
-            .select({
-            id: schema_1.tasks.id,
-            title: schema_1.tasks.title,
-            userId: schema_1.tasks.userId,
-            amount: schema_1.tasks.amount,
-            done: schema_1.tasks.done,
-            signature: schema_1.tasks.signature
-        })
-            .from(schema_1.tasks)
-            .leftJoin(schema_1.submissions, (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.submissions.taskId, schema_1.tasks.id), (0, drizzle_orm_1.eq)(schema_1.submissions.workerId, workerId)))
-            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.isNull)(schema_1.submissions.id), (0, drizzle_orm_1.eq)(schema_1.tasks.done, false)))
-            .limit(1);
-        if (!rows.length) {
-            res.status(404).json({ message: 'No tasks available' });
+        const nextTask = yield (0, databse_1.getNextTask)(workerId);
+        res.json(nextTask);
+        if (!nextTask) {
+            res.status(401).json({ message: "No tasks available!" });
             return;
         }
-        res.json(rows[0]);
     }
-    catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Internal server error' });
+    catch (error) {
+        res.status(401).json({ message: 'Error fetching next task!' });
+        console.log(error);
+        return;
     }
 }));
 router.post('/signin', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const hardcodedAddress = '0x779c7FF70C424B0A494bF524Fd4a021833D8B5bd';
     try {
-        // find the user
         const worker = yield db.query.workers.findFirst({
-            where: (0, drizzle_orm_1.eq)(schema_1.workers.address, hardcodedAddress)
+            where: (0, drizzle_orm_1.eq)(workers.address, hardcodedAddress)
         });
         let existingWorker = worker;
-        // create one if not found
         if (!existingWorker) {
-            const [newWorker] = yield db.insert(schema_1.workers)
+            const [newWorker] = yield db.insert(workers)
                 .values({
                 address: hardcodedAddress,
                 pendingAmount: 0,
@@ -112,12 +104,10 @@ router.post('/signin', (req, res) => __awaiter(void 0, void 0, void 0, function*
         const token = jsonwebtoken_1.default.sign({ workerId: existingWorker.id }, JWT_WORKER, { expiresIn: '7d' });
         console.log(`Token generated! ${token}`);
         res.json({ token });
-        return;
     }
     catch (error) {
         console.error('Error during worker sign-in:', error);
         res.status(500).json({ error: 'Internal server error during sign-in' });
-        return;
     }
 }));
 exports.default = router;
