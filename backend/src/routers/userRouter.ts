@@ -17,6 +17,7 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { authMiddleware } from "../Middlewares/auth";
 import {imageValidate} from "../validate";
+import { TOTAL_DECIMALS } from "../db/databse";
 const router = Router();
 
 // user polls responses on the task
@@ -120,7 +121,6 @@ router.post('/task', authMiddleware as unknown as RequestHandler , async (req: R
 
     // parse signature here to check valid transaction
                 const data = validation.data;
-
                 try {
 
                     const result = await db.transaction(async (tx) => {
@@ -128,7 +128,7 @@ router.post('/task', authMiddleware as unknown as RequestHandler , async (req: R
                             title: data.title,
                             userId: (req as any).userId,
                             signature: 'placeholder',
-                            amount: 100,
+                            amount: 100 * TOTAL_DECIMALS,
                             done: false
                         }).returning();
 

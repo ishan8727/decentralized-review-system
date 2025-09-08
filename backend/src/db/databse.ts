@@ -18,6 +18,8 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 
 export const db = drizzle(pool);
 
+export const TOTAL_DECIMALS = 1000_000_000;
+
 export const getNextTask = async(worker_Id: number)=>{
 	
 	const workerId =  worker_Id;

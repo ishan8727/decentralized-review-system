@@ -61,6 +61,7 @@ const client_s3_1 = require("@aws-sdk/client-s3");
 const s3_request_presigner_1 = require("@aws-sdk/s3-request-presigner");
 const auth_1 = require("../Middlewares/auth");
 const validate_1 = require("../validate");
+const databse_1 = require("../db/databse");
 const router = (0, express_1.Router)();
 // user polls responses on the task
 router.get('/task', auth_1.authMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -149,7 +150,7 @@ router.post('/task', auth_1.authMiddleware, (req, res) => __awaiter(void 0, void
                 title: data.title,
                 userId: req.userId,
                 signature: 'placeholder',
-                amount: 100,
+                amount: 100 * databse_1.TOTAL_DECIMALS,
                 done: false
             }).returning();
             yield tx.insert(schema_1.options).values(data.options.map(x => ({

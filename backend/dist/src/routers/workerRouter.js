@@ -62,6 +62,22 @@ const db = (0, postgres_js_1.drizzle)(client, { schema });
 const JWT_WORKER = (process.env.JWT_SECRET || '') + 'RandomString123';
 const router = (0, express_1.Router)();
 const total_submissions = 100;
+router.post('/payout', auth_1.workerAuthMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    console.log('UserId: ', Number(req.userId));
+    console.log('worker_id:', Number(req.workerId));
+    res.end();
+}));
+// get balance -> locked + pending
+router.get('/balance', auth_1.workerAuthMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const workerId = req.workerId;
+    const [worker] = yield db.select().from(workers)
+        .where((0, drizzle_orm_1.eq)(workers.id, Number(workerId)));
+    res.json({
+        PendingAmount: worker.pendingAmount,
+        LockedAmount: worker.lockedAmount
+    });
+    return;
+}));
 // Submissions endpoint
 router.post('/submissions', auth_1.workerAuthMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const workerId = req.workerId;

@@ -45,7 +45,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getNextTask = exports.db = void 0;
+exports.getNextTask = exports.TOTAL_DECIMALS = exports.db = void 0;
 const node_postgres_1 = require("drizzle-orm/node-postgres");
 const pg_1 = require("pg");
 const schema = __importStar(require("./schema"));
@@ -60,6 +60,7 @@ if (!process.env.DATABASE_URL) {
 }
 const pool = new pg_1.Pool({ connectionString: process.env.DATABASE_URL });
 exports.db = (0, node_postgres_1.drizzle)(pool);
+exports.TOTAL_DECIMALS = 1000000000;
 const getNextTask = (worker_Id) => __awaiter(void 0, void 0, void 0, function* () {
     const workerId = worker_Id;
     if (!workerId) {

@@ -20,6 +20,53 @@ const router = Router();
 
 const total_submissions = 100;
 
+router.post('/payout', workerAuthMiddleware as RequestHandler, async(req, res)=>{
+    const workerId = req.workerId;
+    const worker = await db.select().from(workers)
+    .where(
+        eq(workers.id, Number(workerId))
+    )
+
+    if(!worker) {
+        res.status(403).json({message:'User not found'})
+        return
+    }
+
+    const address = worker[0]?.address;
+
+    // logic here to create txn
+    // @solana/web3.js 
+    // new transaction
+
+    // -> before transfering the txn to blockchain we ->
+    // pending amount -> locked amount.....
+
+    await db.transaction( async (tx)=>{
+        await tx.update(workers).set({
+            lockedAmount: sql`${workers.lockedAmount} + ${worker[0].pendingAmount}`,
+            pendingAmount: sql`${workers.pendingAmount} - ${worker[0].pendingAmount}`
+        }).where(eq(workers.id, Number(worker[0].id)));
+    })
+
+    // now we send a txn to blockchain here
+    // txn1(find worker)+ txn2(pending-- & lcoked++) +txn3(send txn to blockchain)
+    // if fails everything fails and works then everything works!!!!
+})
+
+// get balance -> locked + pending
+router.get('/balance', workerAuthMiddleware as RequestHandler, async (req, res)=>{
+    const workerId = req.workerId;
+
+    const [worker] = await db.select().from(workers)
+    .where(eq(workers.id, Number(workerId)));
+
+    res.json({
+        PendingAmount: worker.pendingAmount,
+        LockedAmount : worker.lockedAmount
+    })
+    return;
+})
+
 // Submissions endpoint
 router.post('/submissions', workerAuthMiddleware as RequestHandler, async (req, res) => {
     const workerId = req.workerId;
@@ -61,7 +108,6 @@ router.post('/submissions', workerAuthMiddleware as RequestHandler, async (req, 
     res.status(201).json({nextTask, 'amount-received': amount  });
     
 });
-
 
 router.get('/nextTask', workerAuthMiddleware as RequestHandler, async (req, res) => {
     const workerId = req.workerId;
