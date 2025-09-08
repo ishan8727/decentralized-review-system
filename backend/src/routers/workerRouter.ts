@@ -1,13 +1,15 @@
 import { RequestHandler, Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { and, eq, isNull } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { workerAuthMiddleware } from '../Middlewares/auth';
 import * as schema from '../db/schema';
 import { getNextTask } from '../db/databse';
+import { createSubmissionInput } from '../validate';
 
-const { workers, tasks, submissions, options } = schema;
+// Destructure all tables from schema
+const { workers, tasks, options, submissions } = schema;
 
 // Initialize Drizzle with schema
 const client = postgres(process.env.DATABASE_URL!);
@@ -16,10 +18,50 @@ const db = drizzle(client, { schema });
 const JWT_WORKER = (process.env.JWT_SECRET || '') + 'RandomString123';
 const router = Router();
 
-router.post('/submissions', workerAuthMiddleware as RequestHandler, async(req, res)=>{
-    // TODO: Implement submission logic
-    res.status(501).json({ message: 'Not implemented' });
+const total_submissions = 100;
+
+// Submissions endpoint
+router.post('/submissions', workerAuthMiddleware as RequestHandler, async (req, res) => {
+    const workerId = req.workerId;
+    const parsed = createSubmissionInput.safeParse(req.body);
+    if (!parsed.success) {
+        res.status(400).json({ error: 'Invalid submission input' });
+        return;
+    }
+    // Verifying taskId against nextTask
+    const taskData = await getNextTask(workerId!);
+    if (!taskData || taskData.task.id != parsed.data.taskId) {
+        res.status(411).json({ message: 'Incorrect task Id' });
+        return;
+    }
+
+    const amount = (taskData.task.amount)/total_submissions;
+
+    const created =  await db.transaction(async (tx)=>{
+        // txn1 -> inserting in submissions......
+        const created = await tx.insert(submissions)
+        .values({
+            workerId: workerId!,
+            optionId: Number(parsed.data.selection),
+            taskId: parsed.data.taskId,
+            amount: Number(amount)
+        })
+        .returning();
+
+        // txn2 -> update workers table to show pending amounts!
+        await tx.update(workers)
+        .set({
+            pendingAmount: sql`${workers.pendingAmount} + ${amount}`
+        })
+        .where(eq(workers.id, Number(workerId)));
+
+        return created;
+    })
+    const nextTask = await getNextTask(workerId!);
+    res.status(201).json({nextTask, 'amount-received': amount  });
+    
 });
+
 
 router.get('/nextTask', workerAuthMiddleware as RequestHandler, async (req, res) => {
     const workerId = req.workerId;

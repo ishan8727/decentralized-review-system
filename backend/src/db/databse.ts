@@ -4,7 +4,6 @@ import * as schema from "./schema";
 import path from 'path';
 import dotenv from 'dotenv';
 
-
 const { workers, tasks, submissions, options } = schema;
 import { and, eq, isNull } from 'drizzle-orm';
 

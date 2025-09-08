@@ -1,5 +1,4 @@
-import { pgTable,serial,text,integer,boolean,pgEnum,uniqueIndex} from 'drizzle-orm/pg-core';
-
+import { pgTable, serial, text, integer, boolean, pgEnum, uniqueIndex } from 'drizzle-orm/pg-core';
 export const txnStatusEnum = pgEnum('TxnStatus', ['Processing', 'Success', 'Failure']);
 
 export const users = pgTable('User', {
@@ -35,7 +34,7 @@ export const submissions = pgTable('Submission', {
   optionId: integer('option_id').notNull(),
   taskId: integer('task_id').notNull(),
   amount: integer('amount').notNull(),
-}, (table) => ({
+}, (table: { workerId: any; taskId: any; }) => ({
   uniqueWorkerTask: uniqueIndex('submission_unique_worker_task').on(table.workerId, table.taskId),
 }));
 

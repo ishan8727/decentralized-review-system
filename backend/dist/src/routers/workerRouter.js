@@ -53,15 +53,50 @@ const postgres_1 = __importDefault(require("postgres"));
 const auth_1 = require("../Middlewares/auth");
 const schema = __importStar(require("../db/schema"));
 const databse_1 = require("../db/databse");
-const { workers, tasks, submissions, options } = schema;
+const validate_1 = require("../validate");
+// Destructure all tables from schema
+const { workers, tasks, options, submissions } = schema;
 // Initialize Drizzle with schema
 const client = (0, postgres_1.default)(process.env.DATABASE_URL);
 const db = (0, postgres_js_1.drizzle)(client, { schema });
 const JWT_WORKER = (process.env.JWT_SECRET || '') + 'RandomString123';
 const router = (0, express_1.Router)();
+const total_submissions = 100;
+// Submissions endpoint
 router.post('/submissions', auth_1.workerAuthMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    // TODO: Implement submission logic
-    res.status(501).json({ message: 'Not implemented' });
+    const workerId = req.workerId;
+    const parsed = validate_1.createSubmissionInput.safeParse(req.body);
+    if (!parsed.success) {
+        res.status(400).json({ error: 'Invalid submission input' });
+        return;
+    }
+    // Verifying taskId against nextTask
+    const taskData = yield (0, databse_1.getNextTask)(workerId);
+    if (!taskData || taskData.task.id != parsed.data.taskId) {
+        res.status(411).json({ message: 'Incorrect task Id' });
+        return;
+    }
+    const amount = (taskData.task.amount) / total_submissions;
+    const created = yield db.transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+        // txn1 -> inserting in submissions......
+        const created = yield tx.insert(submissions)
+            .values({
+            workerId: workerId,
+            optionId: Number(parsed.data.selection),
+            taskId: parsed.data.taskId,
+            amount: Number(amount)
+        })
+            .returning();
+        // txn2 -> update workers table to show pending amounts!
+        yield tx.update(workers)
+            .set({
+            pendingAmount: (0, drizzle_orm_1.sql) `${workers.pendingAmount} + ${amount}`
+        })
+            .where((0, drizzle_orm_1.eq)(workers.id, Number(workerId)));
+        return created;
+    }));
+    const nextTask = yield (0, databse_1.getNextTask)(workerId);
+    res.status(201).json({ nextTask, 'amount-received': amount });
 }));
 router.get('/nextTask', auth_1.workerAuthMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const workerId = req.workerId;

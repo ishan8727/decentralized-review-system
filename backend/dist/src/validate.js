@@ -13,6 +13,6 @@ exports.imageValidate = zod_1.default.object({
     signature: zod_1.default.string()
 });
 exports.createSubmissionInput = zod_1.default.object({
-    taskId: zod_1.default.string(),
+    taskId: zod_1.default.number(),
     selection: zod_1.default.string()
 });

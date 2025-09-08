@@ -9,6 +9,6 @@ export const imageValidate = z.object({
 });
 
 export const createSubmissionInput = z.object({
-    taskId: z.string(),
+    taskId: z.number(),
     selection: z.string()
 })
