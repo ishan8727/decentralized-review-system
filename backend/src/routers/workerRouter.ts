@@ -9,7 +9,7 @@ import { getNextTask } from '../db/databse';
 import { createSubmissionInput } from '../validate';
 
 // Destructure all tables from schema
-const { workers, tasks, options, submissions } = schema;
+const { workers, tasks, options, submissions, payouts } = schema;
 
 // Initialize Drizzle with schema
 const client = postgres(process.env.DATABASE_URL!);
@@ -21,6 +21,12 @@ const router = Router();
 const total_submissions = 100;
 
 router.post('/payout', workerAuthMiddleware as RequestHandler, async(req, res)=>{
+
+    const txnId = '123xxx0d546bsdw'
+
+    // but we still need to add a lock here {I'm not usre where to be precise but I think on txn maybe wrong 3:28 video} -> actually we will lock the (WORKER we fetched) worker as we are playing with worker's amounts..... you get it when you code!!!!!
+    // the lock helps in situations like parallel requests can be created giving like 2 or more txns to same workerId.
+    // so to avoid it we nned to create LOCK -> see how we do it in DrizzleORM
     const workerId = req.workerId;
     const worker = await db.select().from(workers)
     .where(
@@ -46,11 +52,33 @@ router.post('/payout', workerAuthMiddleware as RequestHandler, async(req, res)=>
             lockedAmount: sql`${workers.lockedAmount} + ${worker[0].pendingAmount}`,
             pendingAmount: sql`${workers.pendingAmount} - ${worker[0].pendingAmount}`
         }).where(eq(workers.id, Number(worker[0].id)));
+
+        await tx.insert(payouts).values({
+            userId: Number(workerId),
+            amount: worker[0].lockedAmount,
+            signature: txnId,
+            status: 'Processing'
+            });
+
+        await tx.update(payouts).set({
+            userId: workerId,
+            amount: worker[0].lockedAmount,
+            signature: txnId,
+            status:'Processing'
+        })
     })
 
-    // now we send a txn to blockchain here
+    // NOW WE CAN SEND TXN TO BLOCKCHAIN => specificall after doing all the local server work
+    // as we dont want to process the Blkchn txn before in case server goes down monwy goes boom! 
+    
     // txn1(find worker)+ txn2(pending-- & lcoked++) +txn3(send txn to blockchain)
     // if fails everything fails and works then everything works!!!!
+
+    res.json({
+        status:"Transaction Success",
+        amount: worker[0].pendingAmount,
+        Locked: worker[0].lockedAmount
+    })
 })
 
 // get balance -> locked + pending

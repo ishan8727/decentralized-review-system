@@ -55,7 +55,7 @@ const schema = __importStar(require("../db/schema"));
 const databse_1 = require("../db/databse");
 const validate_1 = require("../validate");
 // Destructure all tables from schema
-const { workers, tasks, options, submissions } = schema;
+const { workers, tasks, options, submissions, payouts } = schema;
 // Initialize Drizzle with schema
 const client = (0, postgres_1.default)(process.env.DATABASE_URL);
 const db = (0, postgres_js_1.drizzle)(client, { schema });
@@ -63,9 +63,54 @@ const JWT_WORKER = (process.env.JWT_SECRET || '') + 'RandomString123';
 const router = (0, express_1.Router)();
 const total_submissions = 100;
 router.post('/payout', auth_1.workerAuthMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    console.log('UserId: ', Number(req.userId));
-    console.log('worker_id:', Number(req.workerId));
-    res.end();
+    var _a;
+    const txnId = '123xxx0d546bsdw';
+    // but we still need to add a lock here {I'm not usre where to be precise but I think on txn maybe wrong 3:28 video} -> actually we will lock the (WORKER we fetched) worker as we are playing with worker's amounts..... you get it when you code!!!!!
+    // the lock helps in situations like parallel requests can be created giving like 2 or more txns to same workerId.
+    // so to avoid it we nned to create LOCK -> see how we do it in DrizzleORM
+    const workerId = req.workerId;
+    const worker = yield db.select().from(workers)
+        .where((0, drizzle_orm_1.eq)(workers.id, Number(workerId)));
+    if (!worker) {
+        res.status(403).json({ message: 'User not found' });
+        return;
+    }
+    const address = (_a = worker[0]) === null || _a === void 0 ? void 0 : _a.address;
+    // logic here to create txn
+    // @solana/web3.js 
+    // new transaction
+    // -> before transfering the txn to blockchain we ->
+    // pending amount -> locked amount.....
+    const payoutTable = yield db.select().from(payouts)
+        .where((0, drizzle_orm_1.eq)(payouts.id, Number(workerId)));
+    console.log(payoutTable);
+    // await db.transaction( async (tx)=>{
+    //     await tx.update(workers).set({
+    //         lockedAmount: sql`${workers.lockedAmount} + ${worker[0].pendingAmount}`,
+    //         pendingAmount: sql`${workers.pendingAmount} - ${worker[0].pendingAmount}`
+    //     }).where(eq(workers.id, Number(worker[0].id)));
+    //     await tx.insert(payouts).values({
+    //         userId: Number(workerId),
+    //         amount: worker[0].lockedAmount,
+    //         signature: txnId,
+    //         status: 'Processing'
+    //         });
+    //     await tx.update(payouts).set({
+    //         userId: workerId,
+    //         amount: worker[0].lockedAmount,
+    //         signature: txnId,
+    //         status:'Processing'
+    //     })
+    // })
+    // NOW WE CAN SEND TXN TO BLOCKCHAIN => specificall after doing all the local server work
+    // as we dont want to process the Blkchn txn before in case server goes down monwy goes boom! 
+    // txn1(find worker)+ txn2(pending-- & lcoked++) +txn3(send txn to blockchain)
+    // if fails everything fails and works then everything works!!!!
+    res.json({
+        status: "Transaction Success",
+        amount: worker[0].pendingAmount,
+        Locked: worker[0].lockedAmount
+    });
 }));
 // get balance -> locked + pending
 router.get('/balance', auth_1.workerAuthMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
