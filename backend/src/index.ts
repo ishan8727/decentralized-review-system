@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import cors from 'cors';
 dotenv.config();
 
 import express from "express";
@@ -9,6 +10,7 @@ const app = express();
 
 // Middleware to parse JSON request bodies
 app.use(express.json());
+app.use(cors());
 
 app.use('/v1/user', userRouter);
 app.use('/v1/worker', workerRouter);
